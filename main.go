@@ -1,14 +1,15 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/tls"
-	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
+	"time"
 
 	"github.com/quic-go/quic-go/http3"
 )
@@ -25,7 +26,7 @@ func main() {
 	key := c.KeyPath
 	scheme := c.Scheme
 
-	fmt.Println("server listening on " + h3addr)
+	log.Println("server listening on " + h3addr)
 
 	// Generate TLS config for HTTP/3 server
 	tconf := tls.Config{Rand: rand.Reader, ServerName: servername, NextProtos: []string{"h3", "h2", "http/1.1"}}
@@ -43,11 +44,8 @@ func main() {
 	defer server.Close()
 
 	// Start Listening
-	h3server_err := server.ListenAndServeTLS(cert, key)
-	if h3server_err != nil {
-		fmt.Println(h3server_err.Error())
-		os.Exit(1)
-	}
+	log.Fatalln(server.ListenAndServeTLS(cert, key))
+
 }
 
 // Handle HTTP Request
@@ -60,6 +58,11 @@ func H3Handler(H1Addr string, H3Addr string, scheme string) http.Handler {
 		}
 		h1Client := &http.Client{Transport: tr}
 		h1req := http.Request{Method: r.Method, URL: &url.URL{Scheme: scheme, Host: H1Addr, Path: r.URL.Path}}
+		ctx, cancel := context.WithDeadline(r.Context(), time.Now().Add(500*time.Microsecond))
+		defer cancel()
+
+		h1req = *h1req.WithContext(ctx)
+
 		// Set H3 headers to H1 Agent
 		h1Header := http.Header{}
 		for h1, v1 := range r.Header {
@@ -69,7 +72,7 @@ func H3Handler(H1Addr string, H3Addr string, scheme string) http.Handler {
 		h1req.Body = r.Body
 		response, h1_err := h1Client.Do(&h1req)
 		if h1_err != nil {
-			fmt.Println(h1_err.Error())
+			log.Println(h1_err.Error())
 			w.WriteHeader(500)
 			return
 		}
@@ -83,7 +86,7 @@ func H3Handler(H1Addr string, H3Addr string, scheme string) http.Handler {
 		defer response.Body.Close()
 		_, e := io.Copy(w, response.Body)
 		if e != nil {
-			fmt.Println(e.Error())
+			log.Println(e.Error())
 			return
 		}
 	})
