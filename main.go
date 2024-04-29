@@ -59,6 +59,7 @@ func H3Handler(H1Addr string, H3Addr string, scheme string) http.Handler {
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
 		h1Client := &http.Client{Transport: tr}
+		// behnamgolds: I prefer http.NewRequestWithContext() but wanted to make as least changes as possible so I don't break anything (If I haven't already!)
 		h1req := http.Request{Method: r.Method, URL: &url.URL{Scheme: scheme, Host: H1Addr, Path: r.URL.Path}}
 		// behnamgolds:  here we add a 500 ms deadline(it is not timeout since it is another function you can check it out in the documentation) (from when the req is recieved)
 		// we get ctx context with set deadline and a cancel function, so we can close it manually sooner than the set deadline if we wanted to.
